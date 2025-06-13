@@ -39,17 +39,26 @@ fn generate_large_csv(file_path: &str, size_gb: u64, names: &[&str]) -> Result<(
             let random_bytes: [u8; 32] = rng.r#gen();
             let mut hasher = Sha256::new();
             hasher.update(random_bytes);
-            let result = hasher.finalize();
-            let id = hex::encode(result);
+            let hash_result = hasher.finalize(); // Renamed for clarity
+
+            // Optimization: Encode SHA256 hash to a stack-allocated buffer
+            // to avoid String allocation for 'id' in each iteration.
+            // SHA256 hash is 32 bytes, hex-encoded it's 64 bytes.
+            let mut id_hex_bytes = [0u8; 64];
+            hex::encode_to_slice(hash_result.as_slice(), &mut id_hex_bytes)
+                .map_err(Box::new)?; // Map hex::Error to Box<dyn Error>
 
             // Choose a random name from the list.
             let name = *names.choose(&mut rng).unwrap_or(&"");
 
-            // Generate a random age.
-            let age = rng.gen_range(18..=60).to_string();
+            // Generate a random age and convert to 2-byte array to avoid allocation.
+            let age_val: u8 = rng.gen_range(18..=60);
+            let mut age_bytes = [0u8; 2];
+            age_bytes[0] = (age_val / 10) + b'0'; // Tens digit
+            age_bytes[1] = (age_val % 10) + b'0'; // Units digit
 
-            // --- FIX 2: Pass all elements as references to create a slice of &str. ---
-            writer.write_record(&[&id, name, &age])?;
+            // --- FIX 2: Pass all elements as AsRef<[u8]>. ---
+            writer.write_record(&[&id_hex_bytes[..], name.as_bytes(), &age_bytes[..]])?;
             row_count += 1;
         }
 
@@ -86,7 +95,7 @@ fn main() {
 
     // Define the output file path and the desired size in gigabytes.
     let output_file_path = "large_data_rust.csv";
-    let desired_size_gb = 100;
+    let desired_size_gb = 10; // Change this to the desired size in GB
 
     if let Err(e) = generate_large_csv(output_file_path, desired_size_gb, &first_names) {
         eprintln!("An error occurred: {}", e);
