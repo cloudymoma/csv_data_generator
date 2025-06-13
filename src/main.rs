@@ -33,7 +33,7 @@ fn generate_large_csv(file_path: &str, size_gb: u64, names: &[&str]) -> Result<(
     // Loop until the file size reaches the target.
     while path.metadata()?.len() < target_size_bytes {
         // Write in large batches to minimize I/O overhead.
-        const BATCH_SIZE: usize = 10_000;
+        const BATCH_SIZE: usize = 500_000;
         for _ in 0..BATCH_SIZE {
             // --- FIX 1: Generate random bytes into a variable first. ---
             let random_bytes: [u8; 32] = rng.r#gen();
